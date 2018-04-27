@@ -172,7 +172,8 @@
     consumer))
 
 (defn listen
-  "Start consuming destination with listener-fn."
+  "Start consuming destination with listener-fn, which can be a Clojure function or instance of javax.jms.MessageListener.
+  Returns created consumer."
   [^Session session destination listener-fn]
   (set-listener (.createConsumer session destination) listener-fn))
 
