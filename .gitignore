@@ -1,5 +1,6 @@
 .nrepl-port
 target/
+pom.xml
 
 .idea
 *.iml
