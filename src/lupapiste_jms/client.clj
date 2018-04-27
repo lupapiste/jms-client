@@ -14,6 +14,11 @@
     (onException [_ e]
       (listener-fn e))))
 
+(defn byte-message-as-array [^BytesMessage m]
+  (let [data (byte-array (.getBodyLength ^BytesMessage m))]
+    (.readBytes ^BytesMessage m data)
+    data))
+
 (defn message-listener
   "Creates a MessageListener instance. Given callback function is fed with data from javax.jms.Message.
    Data type depends on message type: ByteMessage -> bytes, TextMessage -> string, ObjectMessage -> object."
@@ -21,9 +26,7 @@
   (reify MessageListener
     (onMessage [_ m]
       (condp instance? m
-        BytesMessage  (let [data (byte-array (.getBodyLength ^BytesMessage m))]
-                        (.readBytes ^BytesMessage m data)
-                        (cb data))
+        BytesMessage  (cb (byte-message-as-array m))
         TextMessage   (cb (.getText ^TextMessage m))
         ObjectMessage (cb (.getObject ^ObjectMessage m))))))
 
