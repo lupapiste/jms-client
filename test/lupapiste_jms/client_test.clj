@@ -61,7 +61,6 @@
     (createProducer [_]
       JMSProducerImpl)
     (createTextMessage [_ msg]
-      (println "JMSContext text message" msg)
       (text-message msg))
     (close [_]
       (swap! state assoc :jms-context nil)
