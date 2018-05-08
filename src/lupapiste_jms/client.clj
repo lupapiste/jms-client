@@ -71,14 +71,14 @@
      ctx)))
 
 (defn create-byte-message
-  "javax.jms.ByteMessage"
-  [^Session session ^bytes data]
-  (doto (.createBytesMessage session) (.writeBytes ^bytes data)))
+  "javax.jms.ByteMessage. session-or-context is either Session or JMSContext."
+  [session-or-context ^bytes data]
+  (doto (.createBytesMessage session-or-context) (.writeBytes ^bytes data)))
 
 (defn create-text-message
-  "javax.jms.TextMessage"
-  [^Session session ^String data]
-  (.createTextMessage session data))
+  "javax.jms.TextMessage. session-or-context is either Session or JMSContext."
+  [session-or-context ^String data]
+  (.createTextMessage session-or-context data))
 
 (defprotocol MessageCreator
   "Protocol for creating instance of javax.jms.Message."
@@ -87,12 +87,12 @@
 (extend-protocol MessageCreator
 
   (type (byte-array 0))
-  (create-message [^bytes data ^Session session]
-    (create-byte-message session data))
+  (create-message [^bytes data session-or-context]
+    (create-byte-message session-or-context data))
 
   String
-  (create-message [data ^Session session]
-    (create-text-message session data)))
+  (create-message [data session-or-context]
+    (create-text-message session-or-context data)))
 
 (defn set-message-properties
   "Sets given properties (a map) into Message.
