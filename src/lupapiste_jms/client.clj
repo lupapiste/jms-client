@@ -182,8 +182,11 @@
 
 (defn send-with-context
   "JMS 2.0 style producing. Creates context, sends data to destination and finally closes context.
+   Message is created with create-message, which can be extended for other types than String and bytes.
    Options map is passed to create-context and create-jms-producer, see them for usable keys."
-  [^ConnectionFactory cf ^Destination dest ^Message msg & [options-map]]
+  [^ConnectionFactory cf ^Destination dest data & [options-map]]
   (with-open [ctx (create-context cf options-map)]
-    (let [^JMSProducer prod (create-jms-producer ctx options-map)]
-      (.send prod dest msg))))
+    (let [^JMSProducer prod (create-jms-producer ctx options-map)
+          ^Message msg (create-message data ctx)]
+      (.send prod dest msg)
+      nil)))

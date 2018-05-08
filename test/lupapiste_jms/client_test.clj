@@ -3,7 +3,7 @@
             [lupapiste-jms.client :refer :all])
   (:import (javax.jms Connection ConnectionFactory Session Destination
                       MessageProducer MessageConsumer
-                      TextMessage BytesMessage)))
+                      TextMessage BytesMessage JMSProducer JMSContext Message)))
 
 (def state (atom {:started    false
                   :closed     true
@@ -18,12 +18,20 @@
 (defn text-message [text]
   (reify TextMessage
     (getText [_]
+      text)
+    (toString [_]
       text)))
 
 (defn producer [dest]
   (reify MessageProducer
     (send [_ msg]
       (swap! state update-in [:messages :produced] conj {:msg msg :destination dest}))))
+
+(def JMSProducerImpl
+  (reify JMSProducer
+    (^JMSProducer send [this ^Destination dest ^Message msg]
+      (swap! state update-in [:messages :produced] conj {:msg msg :destination dest})
+      this)))
 
 (defn consumer [dest]
   (reify MessageConsumer
@@ -48,6 +56,17 @@
     (createTextMessage [_ msg]
       (text-message msg))))
 
+(def JMSContextImpl
+  (reify JMSContext
+    (createProducer [_]
+      JMSProducerImpl)
+    (createTextMessage [_ msg]
+      (println "JMSContext text message" msg)
+      (text-message msg))
+    (close [_]
+      (swap! state assoc :jms-context nil)
+      nil)))
+
 (def ConnectionImpl
   (reify Connection
     (start [_] (swap! state assoc :started true :closed false))
@@ -65,7 +84,10 @@
       ConnectionImpl)
     (createConnection [_ username password]
       (swap! state assoc :connection (with-meta ConnectionImpl {:username username :password password}))
-      ConnectionImpl)))
+      ConnectionImpl)
+    (createContext [_ session-mode]
+      (swap! state assoc :jms-context JMSContextImpl)
+      JMSContextImpl)))
 
 (deftest connection-test
   (let [conn (create-connection FactoryImpl)]
@@ -107,7 +129,7 @@
   (is (zero? (count (get-in @state [:messages :consumed]))) "No received messages yet")
   (is (= 1   (count (get-in @state [:messages :produced]))) "One message produced")
   (let [test-session (-> (:sessions @state) (first) :session)
-        listener (listen test-session QueueImpl message-listener-fn)]
+        ^MessageConsumer listener (listen test-session QueueImpl message-listener-fn)]
     (is (instance? MessageConsumer listener))
     (is (not (zero? (count (:consumers @state)))) "Consumer registered")
     (is (= 1 (count (get-in @state [:messages :consumed]))) "One message was received by listener ('consumed')")
@@ -140,3 +162,13 @@
         "Bytes 'data' correct")
     (is (thrown? IllegalArgumentException (create-message {:invalid :map} test-message-session))
         "No protocol implementation for map")))
+
+(deftest produce-with-context
+  (swap! state assoc-in [:messages :produced] [])
+  (let [test-data "context-test-string"]
+    (is (empty? (get-in @state [:messages :produced])) "No messages yet")
+    (is (nil? (send-with-context FactoryImpl QueueImpl test-data)) "Send with context OK")
+    (let [msgs (get-in @state [:messages :produced])]
+      (is (= 1 (count msgs)) "One message produced")
+      (is (= test-data (-> msgs (first) :msg (.getText))) "Correct message"))
+    (is (nil? (get @state :jms-context)) "JMSContext is closed")))
