@@ -69,16 +69,18 @@
        (.setExceptionListener ctx ex-listener))
      ctx)))
 
-(defn create-byte-message
-  "javax.jms.ByteMessage. session-or-context is either Session or JMSContext."
-  ^BytesMessage [session-or-context ^bytes data]
-  (doto (.createBytesMessage session-or-context)
-    (.writeBytes ^bytes data)))
+(defprotocol MessageFactory
+  (create-byte-message ^BytesMessage [factory ^bytes bytes] "Create a javax.jms.BytesMessage from the byte array.")
+  (create-text-message ^TextMessage [factory ^String s] "Create a javax.jms.TextMessage from the String."))
 
-(defn create-text-message
-  "javax.jms.TextMessage. session-or-context is either Session or JMSContext."
-  ^TextMessage [session-or-context ^String data]
-  (.createTextMessage session-or-context data))
+(extend-protocol MessageFactory
+  Session
+  (create-byte-message [factory bytes] (doto (.createBytesMessage factory) (.writeBytes bytes)))
+  (create-text-message [factory s] (.createTextMessage factory s))
+
+  JMSContext
+  (create-byte-message [factory bytes] (doto (.createBytesMessage factory) (.writeBytes bytes)))
+  (create-text-message [factory s] (.createTextMessage factory s)))
 
 (defprotocol MessageCreator
   "Protocol for creating instance of javax.jms.Message."
@@ -86,12 +88,10 @@
 
 (extend-protocol MessageCreator
   (type (byte-array 0))
-  (create-message [^bytes data session-or-context]
-    (create-byte-message session-or-context data))
+  (create-message [data factory] (create-byte-message factory data))
 
   String
-  (create-message [data session-or-context]
-    (create-text-message session-or-context data)))
+  (create-message [data factory] (create-text-message factory data)))
 
 (defn set-message-properties
   "Sets given properties (a map) into Message.
