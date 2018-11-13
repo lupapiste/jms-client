@@ -9,12 +9,11 @@
 
 (defn exception-listener
   "Implements ExceptionListener. Passes exception to given listener-fn."
-  [listener-fn]
+  ^ExceptionListener [listener-fn]
   (reify ExceptionListener
-    (onException [_ e]
-      (listener-fn e))))
+    (onException [_ e] (listener-fn e))))
 
-(defn byte-message-as-array [^BytesMessage m]
+(defn byte-message-as-array ^bytes [^BytesMessage m]
   (let [data (byte-array (.getBodyLength ^BytesMessage m))]
     (.readBytes ^BytesMessage m data)
     data))
@@ -22,12 +21,12 @@
 (defn message-listener
   "Creates a MessageListener instance. Given callback function is fed with data from javax.jms.Message.
    Data type depends on message type: ByteMessage -> bytes, TextMessage -> string, ObjectMessage -> object."
-  [cb]
+  ^MessageListener [cb]
   (reify MessageListener
     (onMessage [_ m]
       (condp instance? m
-        BytesMessage  (cb (byte-message-as-array m))
-        TextMessage   (cb (.getText ^TextMessage m))
+        BytesMessage (cb (byte-message-as-array m))
+        TextMessage (cb (.getText ^TextMessage m))
         ObjectMessage (cb (.getObject ^ObjectMessage m))))))
 
 (defn create-connection
@@ -47,9 +46,9 @@
 
 (defn create-session
   "JMS 2.0 spec'd session creator."
-  ([^Connection conn]
+  (^Session [^Connection conn]
    (create-session conn JMSContext/AUTO_ACKNOWLEDGE))
-  ([^Connection conn session-mode]
+  (^Session [^Connection conn session-mode]
    (.createSession conn session-mode)))
 
 (defn create-context
@@ -72,12 +71,13 @@
 
 (defn create-byte-message
   "javax.jms.ByteMessage. session-or-context is either Session or JMSContext."
-  [session-or-context ^bytes data]
-  (doto (.createBytesMessage session-or-context) (.writeBytes ^bytes data)))
+  ^BytesMessage [session-or-context ^bytes data]
+  (doto (.createBytesMessage session-or-context)
+    (.writeBytes ^bytes data)))
 
 (defn create-text-message
   "javax.jms.TextMessage. session-or-context is either Session or JMSContext."
-  [session-or-context ^String data]
+  ^TextMessage [session-or-context ^String data]
   (.createTextMessage session-or-context data))
 
 (defprotocol MessageCreator
@@ -85,7 +85,6 @@
   (create-message [data session] "Create Message depending on type of data."))
 
 (extend-protocol MessageCreator
-
   (type (byte-array 0))
   (create-message [^bytes data session-or-context]
     (create-byte-message session-or-context data))
@@ -97,7 +96,7 @@
 (defn set-message-properties
   "Sets given properties (a map) into Message.
   Returns possibly mutated msg."
-  [^Message msg properties]
+  ^Message [^Message msg properties]
   (doseq [[^String k v] properties]
     (condp instance? v
       Boolean (.setBooleanProperty msg k v)
@@ -119,9 +118,9 @@
      - :ttl
      - :correlation-id
      - :reply-to"
-  ([^JMSContext ctx]
+  (^JMSProducer [^JMSContext ctx]
    (.createProducer ctx))
-  ([^JMSContext ctx {:keys [delivery-mode delivery-delay ttl correlation-id reply-to]}]
+  (^JMSProducer [^JMSContext ctx {:keys [delivery-mode delivery-delay ttl correlation-id reply-to]}]
    (let [producer (.createProducer ctx)]
      (when delivery-mode
        (.setDeliveryMode producer delivery-mode))
@@ -137,7 +136,7 @@
 
 (defn create-producer
   "Creates message producer for given destination (JMS 1.1)"
-  [^Session session ^Destination destination]
+  ^MessageProducer [^Session session ^Destination destination]
   (.createProducer session destination))
 
 (defn producer-fn
@@ -158,8 +157,7 @@
   [^Session session producer]
   (producer-fn producer (partial create-byte-message session)))
 
-(defn create-consumer ^MessageConsumer
-[^Session session ^Destination destination]
+(defn create-consumer ^MessageConsumer [^Session session ^Destination destination]
   (.createConsumer session destination))
 
 (defn set-listener
@@ -167,7 +165,7 @@
   Listener-fn can be instance of MessageListener or a regular Clojure function.
   For regular function, an MessageListener instance is created and the function is fed with data from javax.jms.Message.
   Given consumer is returned."
-  [^MessageConsumer consumer listener-fn]
+  ^MessageConsumer [^MessageConsumer consumer listener-fn]
   (let [listener (condp instance? listener-fn
                    MessageListener listener-fn
                    clojure.lang.Fn (message-listener listener-fn))]
@@ -177,7 +175,7 @@
 (defn listen
   "Start consuming destination with listener-fn, which can be a Clojure function or instance of javax.jms.MessageListener.
   Returns created consumer."
-  [^Session session destination listener-fn]
+  ^MessageConsumer [^Session session destination listener-fn]
   (set-listener (.createConsumer session destination) listener-fn))
 
 (defn send-with-context
