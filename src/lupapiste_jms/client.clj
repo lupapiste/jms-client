@@ -91,6 +91,19 @@
     (.readBytes ^BytesMessage m data)
     data))
 
+(defprotocol MessageContent
+  (message-content [msg]))
+
+(extend-protocol MessageContent
+  BytesMessage
+  (message-content ^bytes [msg] (byte-message-as-array msg))
+
+  TextMessage
+  (message-content ^String [msg] (.getText msg))
+
+  ObjectMessage
+  (message-content ^Object [msg] (.getObject msg)))
+
 (defn set-message-properties
   "Sets given properties (a map) into Message.
   Returns possibly mutated msg."
@@ -174,15 +187,10 @@
   (.createConsumer session destination))
 
 (defn message-listener
-  "Creates a MessageListener instance. Given callback function is fed with data from javax.jms.Message.
-   Data type depends on message type: ByteMessage -> bytes, TextMessage -> string, ObjectMessage -> object."
+  "Creates a MessageListener instance. Given callback function is fed with `message-content` of javax.jms.Message."
   ^MessageListener [cb]
   (reify MessageListener
-    (onMessage [_ m]
-      (condp instance? m
-        BytesMessage (cb (byte-message-as-array m))
-        TextMessage (cb (.getText ^TextMessage m))
-        ObjectMessage (cb (.getObject ^ObjectMessage m))))))
+    (onMessage [_ m] (cb (message-content m)))))
 
 (defn exception-listener
   "Implements ExceptionListener. Passes exception to given listener-fn."
