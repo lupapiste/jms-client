@@ -3,6 +3,7 @@
   (:require [clojure.string :as s])
   (:import [javax.jms Connection ConnectionFactory Session
                       Destination ExceptionListener MessageListener
+                      Queue Topic
                       JMSContext JMSProducer
                       Message MessageProducer MessageConsumer
                       BytesMessage ObjectMessage TextMessage]
@@ -61,6 +62,7 @@
 ;;;; ===================================================================================================================
 
 (defprotocol MessageFactory
+  "Protocol for creating specific javax.jms.Message subtypes."
   (create-byte-message ^BytesMessage [factory ^bytes bytes] "Create a javax.jms.BytesMessage from the byte array.")
   (create-text-message ^TextMessage [factory ^String s] "Create a javax.jms.TextMessage from the String."))
 
@@ -75,7 +77,7 @@
 
 (defprotocol MessageCreator
   "Protocol for creating instance of javax.jms.Message."
-  (create-message [data session] "Create Message depending on type of data."))
+  (create-message [data message-factory] "Create Message depending on type of data."))
 
 (extend-protocol MessageCreator
   (type (byte-array 0))
@@ -105,6 +107,15 @@
       String (.setStringProperty msg k v)
       (.setObjectProperty msg k v)))
   msg)
+
+;;;; Queues and Topics
+;;;; ===================================================================================================================
+
+(defn create-queue ^Queue [^Session session name]
+  (.createQueue session name))
+
+(defn create-topic ^Topic [^Session session name]
+  (.createTopic session name))
 
 ;;;; Producers
 ;;;; ===================================================================================================================
