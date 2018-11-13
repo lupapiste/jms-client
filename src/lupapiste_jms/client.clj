@@ -27,7 +27,7 @@
        (.setExceptionListener conn ex-listener))
      conn)))
 
-;;;; Sessions
+;;;; Sessions and Transactions
 ;;;; ===================================================================================================================
 
 (defn create-session
@@ -36,6 +36,12 @@
    (create-session conn JMSContext/AUTO_ACKNOWLEDGE))
   (^Session [^Connection conn session-mode]
    (.createSession conn session-mode)))
+
+(defn create-transacted-session ^Session [conn]
+  (create-session conn Session/SESSION_TRANSACTED))
+
+(defn commit [^Session session] (.commit session))
+(defn rollback [^Session session] (.rollback session))
 
 ;;;; Contexts
 ;;;; ===================================================================================================================
