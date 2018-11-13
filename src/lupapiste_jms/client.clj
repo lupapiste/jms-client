@@ -1,33 +1,15 @@
 (ns lupapiste-jms.client
   "Thin Clojure wrapper for JMS client-side usage."
   (:require [clojure.string :as s])
-  (:import (javax.jms Connection ConnectionFactory Session
+  (:import [javax.jms Connection ConnectionFactory Session
                       Destination ExceptionListener MessageListener
                       JMSContext JMSProducer
                       Message MessageProducer MessageConsumer
-                      BytesMessage ObjectMessage TextMessage)))
+                      BytesMessage ObjectMessage TextMessage]
+           [clojure.lang Fn]))
 
-(defn exception-listener
-  "Implements ExceptionListener. Passes exception to given listener-fn."
-  ^ExceptionListener [listener-fn]
-  (reify ExceptionListener
-    (onException [_ e] (listener-fn e))))
-
-(defn byte-message-as-array ^bytes [^BytesMessage m]
-  (let [data (byte-array (.getBodyLength ^BytesMessage m))]
-    (.readBytes ^BytesMessage m data)
-    data))
-
-(defn message-listener
-  "Creates a MessageListener instance. Given callback function is fed with data from javax.jms.Message.
-   Data type depends on message type: ByteMessage -> bytes, TextMessage -> string, ObjectMessage -> object."
-  ^MessageListener [cb]
-  (reify MessageListener
-    (onMessage [_ m]
-      (condp instance? m
-        BytesMessage (cb (byte-message-as-array m))
-        TextMessage (cb (.getText ^TextMessage m))
-        ObjectMessage (cb (.getObject ^ObjectMessage m))))))
+;;;; Connections
+;;;; ===================================================================================================================
 
 (defn create-connection
   "Creates connection to given connection factory. Doesn't start the connection.
@@ -44,12 +26,18 @@
        (.setExceptionListener conn ex-listener))
      conn)))
 
+;;;; Sessions
+;;;; ===================================================================================================================
+
 (defn create-session
   "JMS 2.0 spec'd session creator."
   (^Session [^Connection conn]
    (create-session conn JMSContext/AUTO_ACKNOWLEDGE))
   (^Session [^Connection conn session-mode]
    (.createSession conn session-mode)))
+
+;;;; Contexts
+;;;; ===================================================================================================================
 
 (defn create-context
   "Creates JMSContext (JMS 2.0).
@@ -68,6 +56,9 @@
      (when ex-listener
        (.setExceptionListener ctx ex-listener))
      ctx)))
+
+;;;; Messages
+;;;; ===================================================================================================================
 
 (defprotocol MessageFactory
   (create-byte-message ^BytesMessage [factory ^bytes bytes] "Create a javax.jms.BytesMessage from the byte array.")
@@ -93,6 +84,11 @@
   String
   (create-message [data factory] (create-text-message factory data)))
 
+(defn byte-message-as-array ^bytes [^BytesMessage m]
+  (let [data (byte-array (.getBodyLength ^BytesMessage m))]
+    (.readBytes ^BytesMessage m data)
+    data))
+
 (defn set-message-properties
   "Sets given properties (a map) into Message.
   Returns possibly mutated msg."
@@ -109,6 +105,9 @@
       String (.setStringProperty msg k v)
       (.setObjectProperty msg k v)))
   msg)
+
+;;;; Producers
+;;;; ===================================================================================================================
 
 (defn create-jms-producer
   "Creates JMS 2.0 defined JMSProducer.
@@ -157,8 +156,28 @@
   [^Session session producer]
   (producer-fn producer (partial create-byte-message session)))
 
+;;;; Consumers
+;;;; ===================================================================================================================
+
 (defn create-consumer ^MessageConsumer [^Session session ^Destination destination]
   (.createConsumer session destination))
+
+(defn message-listener
+  "Creates a MessageListener instance. Given callback function is fed with data from javax.jms.Message.
+   Data type depends on message type: ByteMessage -> bytes, TextMessage -> string, ObjectMessage -> object."
+  ^MessageListener [cb]
+  (reify MessageListener
+    (onMessage [_ m]
+      (condp instance? m
+        BytesMessage (cb (byte-message-as-array m))
+        TextMessage (cb (.getText ^TextMessage m))
+        ObjectMessage (cb (.getObject ^ObjectMessage m))))))
+
+(defn exception-listener
+  "Implements ExceptionListener. Passes exception to given listener-fn."
+  ^ExceptionListener [listener-fn]
+  (reify ExceptionListener
+    (onException [_ e] (listener-fn e))))
 
 (defn set-listener
   "Set a MessageListener for consumer.
@@ -168,7 +187,7 @@
   ^MessageConsumer [^MessageConsumer consumer listener-fn]
   (let [listener (condp instance? listener-fn
                    MessageListener listener-fn
-                   clojure.lang.Fn (message-listener listener-fn))]
+                   Fn (message-listener listener-fn))]
     (.setMessageListener consumer listener)
     consumer))
 
