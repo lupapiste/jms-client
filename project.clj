@@ -1,4 +1,4 @@
-(defproject lupapiste/jms-client "0.2.1"
+(defproject lupapiste/jms-client "0.3.0"
   :description "Thin JMS client"
   :url "https://www.evolta.fi"
   :license {:name "Eclipse Public License"
