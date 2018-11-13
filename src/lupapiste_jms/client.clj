@@ -83,7 +83,7 @@
 
 (defprotocol MessageCreator
   "Protocol for creating instance of javax.jms.Message."
-  (create-message [data message-factory] "Create Message depending on type of data."))
+  (create-message ^Message [data message-factory] "Create Message depending on type of data."))
 
 (extend-protocol MessageCreator
   (type (byte-array 0))
